@@ -42,17 +42,17 @@ def video_writer(data: np.array, name: str, frames_per_sec: int)-> None:
     video.release()
     cv.destroyAllWindows()
 
-    
-# -----> Import Car Images & Write Video <----- #
-car = import_images('Data/car')
-video_writer(car,'car', 23)
+if __name__ == '__main__':    
+    # -----> Import Car Images & Write Video <----- #
+    car = import_images('Data/car')
+    video_writer(car,'car', 23)
 
-# -----> Import human Images & Write Video <----- #
-human = import_images('Data/human')
-video_writer(human, 'human', 23)
+    # -----> Import human Images & Write Video <----- #
+    human = import_images('Data/human')
+    video_writer(human, 'human', 23)
 
-# -----> Import Vase Images & Write Video <----- #
-vase = import_images('Data/vase')
-video_writer(vase, 'vase', 23)
+    # -----> Import Vase Images & Write Video <----- #
+    vase = import_images('Data/vase')
+    video_writer(vase, 'vase', 23)
 
-print('Done..!')
+    print('Done..!')

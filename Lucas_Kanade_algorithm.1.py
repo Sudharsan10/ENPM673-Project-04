@@ -13,6 +13,7 @@ import time
 import sys
 import numpy as np
 import cv2 as cv
+import video_writer as vw
 
 # =============================================================================================================================================================================================================================== #
 # Function Definition
@@ -40,7 +41,6 @@ def lucas_kanade_algorithm(Template_data, I, parameters, start, end, threshold =
     X_gradient = cv.Sobel(I, cv.CV_64F, 1, 0, ksize=3)
     Y_gradient = cv.Sobel(I, cv.CV_64F, 0, 1, ksize=3)
     delta_parameter = 1
-    print(parameters)
     while (delta_parameter > threshold ):
         Warp_matrix = np.array([ [1+parameters[0,0], parameters[0,2], parameters[0,4]], [parameters[0,1], 1+parameters[0,3], parameters[0,5]] ])
         parameters, delta_parameter = resolver(I, Warp_matrix, Template_data, X_gradient, Y_gradient, parameters)
@@ -59,7 +59,7 @@ def mark_the_object(event, x, y, flags, param):
 # =============================================================================================================================================================================================================================== #
 # Import the Video
 # =============================================================================================================================================================================================================================== #
-global start_point, end_point 
+start_point, end_point = tuple(), tuple()
 # -----> Read the Key frame from the Video <----- #
 video = cv.VideoCapture('Videos/car.avi', 0 )                                                                           # Read the Video saved 
 ret, key_frame = video.read()                                                                                           # Read the first key frame identify and mark the object
@@ -81,7 +81,7 @@ for i in range(start_point[0], end_point[0]):
 count = 0
 template_mean = np.mean(key_frame)
 affine_parameters = np.zeros((1,6))
-while video.isOpened():
+while True:
     ret, key_frame = video.read()
     if ret:
         key_frame_gray = cv.cvtColor(key_frame, cv.COLOR_BGR2GRAY)
@@ -90,10 +90,23 @@ while video.isOpened():
         key_frame_gray_normalised = key_frame_gray_normalised * (template_mean/image_mean)
         W_mat, affine_parameters, st, en = lucas_kanade_algorithm(ROI_Data, key_frame_gray_normalised, affine_parameters, start_point, end_point)
         cv.rectangle(key_frame, (st[0], st[1]), (en[0], en[1]), (0, 0, 255), 3)
-        cv.imshow("OT", key_frame_gray)
-        cv.imshow("xcv", key_frame)
         cv.imwrite("Output/car/"+str(count)+".jpg", key_frame)
+        cv.imshow("Detection", key_frame)
+        key = cv.waitKey(1)
         count += 1
-        if cv.waitKey(1) & 0xFF == ord('q'): break
+        if key == ord('q'): break
+    else: break
 video.release()
 cv.destroyAllWindows()
+
+# -----> Import Car Images & Write Video <----- #
+car = vw.import_images('Output/car')
+vw.video_writer(car, 'car_output', 23)
+
+# # -----> Import human Images & Write Video <----- #
+# human = vw.import_images('Output/human')
+# vw.video_writer(human, 'human_output', 23)
+
+# # -----> Import Vase Images & Write Video <----- #
+# vase = vw.import_images('Output/vase')
+# vw.video_writer(vase, 'vase_output', 23)
