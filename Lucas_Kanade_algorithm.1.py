@@ -53,60 +53,86 @@ def mark_the_object(event, x, y, flags, param):
     global start_point, end_point
     if event == cv.EVENT_LBUTTONDOWN:
         start_point = (x, y)
+        print("Start:", start_point)
     elif event == cv.EVENT_LBUTTONUP:
         end_point = (x, y)
+        print("End:", end_point)
+        cv.rectangle(template, (start_point[0], start_point[1]), (end_point[0], end_point[1]), (0,0,255), 3)
+        cv.imshow("Object Selection", template)
+        cv.waitKey(2)
 
 # =============================================================================================================================================================================================================================== #
-# Import the Video
+# Object Detection Function
+# =============================================================================================================================================================================================================================== #
+def object_detection(name):
+    global start_point, end_point, template
+    # -----> Read the Key frame from the Video <----- #
+    # Read the Video saved
+    video = cv.VideoCapture('Videos/'+name+'.avi', 0)
+    ret, key_frame = video.read()        
+    template = key_frame.copy()                                                                                                    # Read the first key frame identify and mark the object
+    key_frame = cv.cvtColor(key_frame, cv.COLOR_BGR2GRAY)                                                                   # Converting the key frame to  Grayscale
+    cv.namedWindow("Object Selection")                                                                                      # Creating a named window to set callback function
+    cv.setMouseCallback("Object Selection", mark_the_object)                                                                # Set a Mouse callback to register the mouse action to extract the ROI
+    cv.imshow("Object Selection", key_frame)                                                                                # Show the first frame to select the object to be tracked 
+    cv.waitKey(0)
+    cv.destroyAllWindows()                                                                                                  # Get Height and Width of the Image frame
+    obj_height, obj_width = abs(start_point[1]-end_point[1]), abs(start_point[0]-end_point[0])                              # Get the height and width of the obj selected
+    ROI_Data = np.zeros((obj_height * obj_width, 4))                                                                        # Region of Interest 
+    index = 0
+    # -----> Extracting the Object information and Storing in ROI_Data <----- #
+    for i in range(start_point[0], end_point[0]):
+        for j in range(start_point[1], end_point[1]):
+            ROI_Data[index] = [i, j, 1, key_frame[j, i]]
+            index += 1
+    count = 0
+    template_mean = np.mean(key_frame)
+    affine_parameters = np.zeros((1,6))
+    while True:
+        ret, key_frame = video.read()
+        if ret:
+            key_frame_gray = cv.cvtColor(key_frame, cv.COLOR_BGR2GRAY)
+            image_mean = np.mean(key_frame_gray)
+            key_frame_gray_normalised = key_frame_gray.astype(float)
+            key_frame_gray_normalised = key_frame_gray_normalised * (template_mean/image_mean)
+            W_mat, affine_parameters, st, en = lucas_kanade_algorithm(ROI_Data, key_frame_gray_normalised, affine_parameters, start_point, end_point)
+            top_left = np.array([[start_point[0]], [start_point[1]], [1]])
+            top_right = np.array([[end_point[0]], [start_point[1]], [1]])
+            bottom_left = np.array([[start_point[0]], [end_point[1]], [1]])
+            bottom_right = np.array([[end_point[0]], [end_point[1]], [1]])
+
+            top_left = np.matmul(W_mat, top_left)
+            top_right = np.matmul(W_mat, top_right)
+            bottom_left = np.matmul(W_mat, bottom_left)
+            bottom_right = np.matmul(W_mat, bottom_right)
+
+            cv.line(key_frame, (top_left[0], top_left[1]), (top_right[0], top_right[1]), (0, 0, 255), 2)
+            cv.line(key_frame, (top_left[0], top_left[1]), (bottom_left[0], bottom_left[1]), (0, 0, 255), 2)
+            cv.line(key_frame, (bottom_right[0], bottom_right[1]), (top_right[0], top_right[1]), (0, 0, 255), 2)
+            cv.line(key_frame, (bottom_left[0], bottom_left[1]), (bottom_right[0], bottom_right[1]), (0, 0, 255), 2)
+            
+            # cv.rectangle(key_frame, (st[0], st[1]), (en[0], en[1]), (0, 0, 255), 3)
+            cv.imwrite('Output/'+name+'/'+str(count).zfill(4)+'.jpg', key_frame)
+            cv.imshow("Detection", key_frame)
+            key = cv.waitKey(1)
+            count += 1
+            if key == ord('q'): break
+        else: break
+    video.release()
+    cv.destroyAllWindows()
+    # -----> Import Car Images & Write Video <----- #
+    images = vw.import_images('Output/'+name)
+    vw.video_writer(images, name+'_output', 23)
+
+
+
+# =============================================================================================================================================================================================================================== #
+# Run the program by uncommenting the appropriate lines below
 # =============================================================================================================================================================================================================================== #
 start_point, end_point = tuple(), tuple()
-# -----> Read the Key frame from the Video <----- #
-video = cv.VideoCapture('Videos/car.avi', 0 )                                                                           # Read the Video saved 
-ret, key_frame = video.read()                                                                                           # Read the first key frame identify and mark the object
-key_frame = cv.cvtColor(key_frame, cv.COLOR_BGR2GRAY)                                                                   # Converting the key frame to  Grayscale
-cv.namedWindow("Object Selection")                                                                                      # Creating a named window to set callback function
-cv.setMouseCallback("Object Selection", mark_the_object)                                                                # Set a Mouse callback to register the mouse action to extract the ROI
-cv.imshow("Object Selection", key_frame)                                                                                # Show the first frame to select the object to be tracked 
-cv.waitKey(0)
-cv.destroyAllWindows()
-frame_height, frame_width = key_frame.shape                                                                             # Get Height and Width of the Image frame
-obj_height, obj_width = abs(start_point[1]-end_point[1]), abs(start_point[0]-end_point[0])                              # Get the height and width of the obj selected
-ROI_Data = np.zeros((obj_height * obj_width, 4))                                                                        # Region of Interest 
-index = 0
-# -----> Extracting the Object information and Storing in ROI_Data <----- #
-for i in range(start_point[0], end_point[0]):
-    for j in range(start_point[1], end_point[1]):
-        ROI_Data[index] = [i, j, 1, key_frame[j, i]]
-        index += 1
-count = 0
-template_mean = np.mean(key_frame)
-affine_parameters = np.zeros((1,6))
-while True:
-    ret, key_frame = video.read()
-    if ret:
-        key_frame_gray = cv.cvtColor(key_frame, cv.COLOR_BGR2GRAY)
-        image_mean = np.mean(key_frame_gray)
-        key_frame_gray_normalised = key_frame_gray.astype(float)
-        key_frame_gray_normalised = key_frame_gray_normalised * (template_mean/image_mean)
-        W_mat, affine_parameters, st, en = lucas_kanade_algorithm(ROI_Data, key_frame_gray_normalised, affine_parameters, start_point, end_point)
-        cv.rectangle(key_frame, (st[0], st[1]), (en[0], en[1]), (0, 0, 255), 3)
-        cv.imwrite("Output/car/"+str(count)+".jpg", key_frame)
-        cv.imshow("Detection", key_frame)
-        key = cv.waitKey(1)
-        count += 1
-        if key == ord('q'): break
-    else: break
-video.release()
-cv.destroyAllWindows()
 
-# -----> Import Car Images & Write Video <----- #
-car = vw.import_images('Output/car')
-vw.video_writer(car, 'car_output', 23)
+object_detection('car')                                                                                                     # Uncomment to run car detection
+# object_detection('human')                                                                                                   # Uncomment to run Human detection
+# object_detection('vase')                                                                                                    # Uncomment to run Vase detection
 
-# # -----> Import human Images & Write Video <----- #
-# human = vw.import_images('Output/human')
-# vw.video_writer(human, 'human_output', 23)
 
-# # -----> Import Vase Images & Write Video <----- #
-# vase = vw.import_images('Output/vase')
-# vw.video_writer(vase, 'vase_output', 23)
